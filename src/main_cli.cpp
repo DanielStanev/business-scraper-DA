@@ -12,6 +12,7 @@
 #include "MapScraper.h"
 #include "Business.h"
 #include "Formatter.h"
+#include "WebScraper.h"
 
 // Structure to hold program options
 struct ProgramOptions {
@@ -20,6 +21,7 @@ struct ProgramOptions {
     int max_radius = 5000;
     int max_results = 20;
     OutputFormat output_format = OutputFormat::CSV;
+    bool enhance_with_web_scraping = true;
     bool show_help = false;
 };
 
@@ -60,13 +62,20 @@ int main(int argc, char** argv) {
     // Search for businesses
     std::vector<Business> businesses = scraper.search_businesses();
 
-    // Format and save results
-    Formatter formatter(options.output_format);
-
     if (businesses.empty()) {
         std::cout << "No businesses found." << std::endl;
         return 0;
     }
+
+    // Enhance businesses with web scraping
+    if (options.enhance_with_web_scraping) {
+        WebScraper web_scraper;
+        web_scraper.enhance_businesses(businesses);
+        std::cout << std::endl;
+    }
+
+    // Format and save results
+    Formatter formatter(options.output_format);
 
     // Generate output
     std::string formatted_output = formatter.format_businesses(businesses);
@@ -96,8 +105,10 @@ void print_usage(const char* program_name) {
               << "  -d, --distance METERS     Max search radius in meters (default: 5000)\n"
               << "  -r, --results NUMBER      Max number of results (default: 20)\n"
               << "  -f, --format FORMAT       Output format: csv, json, yaml, xml (default: csv)\n"
+              << "  --no-web-scraping        Disable web scraping enhancement (faster but less data)\n"
               << "  -h, --help               Show this help message\n\n"
               << "The Google Maps API key should be configured in config.ini file.\n"
+              << "Web scraping is enabled by default to gather additional contact information.\n"
               << std::endl;
 }
 
@@ -133,12 +144,13 @@ std::string read_api_key_from_config() {
 bool parse_command_line(int argc, char** argv, ProgramOptions& options) {
     // Define command line options
     static struct option long_options[] = {
-        {"keyword",   required_argument, 0, 'k'},
-        {"location",  required_argument, 0, 'l'},
-        {"distance",  required_argument, 0, 'd'},
-        {"results",   required_argument, 0, 'r'},
-        {"format",    required_argument, 0, 'f'},
-        {"help",      no_argument,       0, 'h'},
+        {"keyword",         required_argument, 0, 'k'},
+        {"location",        required_argument, 0, 'l'},
+        {"distance",        required_argument, 0, 'd'},
+        {"results",         required_argument, 0, 'r'},
+        {"format",          required_argument, 0, 'f'},
+        {"no-web-scraping", no_argument,       0, 'n'},
+        {"help",            no_argument,       0, 'h'},
         {0, 0, 0, 0}
     };
 
@@ -146,7 +158,7 @@ bool parse_command_line(int argc, char** argv, ProgramOptions& options) {
     int c;
 
     // Parse command line arguments
-    while ((c = getopt_long(argc, argv, "k:l:d:r:f:h", long_options, &option_index)) != -1) {
+    while ((c = getopt_long(argc, argv, "k:l:d:r:f:nh", long_options, &option_index)) != -1) {
         switch (c) {
             case 'k':
                 options.keyword = optarg;
@@ -186,6 +198,9 @@ bool parse_command_line(int argc, char** argv, ProgramOptions& options) {
                 }
                 break;
             }
+            case 'n':
+                options.enhance_with_web_scraping = false;
+                break;
             case 'h':
                 print_usage(argv[0]);
                 options.show_help = true;

@@ -32,6 +32,7 @@ echo "Compiling with g++..."
 g++ -std=c++17 -Wall -Wextra -Iinclude \
     src/classes/Business.cpp \
     src/classes/MapScraper.cpp \
+    src/classes/WebScraper.cpp \
     src/classes/Formatter.cpp \
     src/main_cli.cpp \
     $CURL_FLAGS $JSONCPP_FLAGS \
