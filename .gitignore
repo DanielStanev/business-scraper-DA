@@ -1,7 +1,7 @@
 # Folders
 build
-output
 .vscode
+/output
 
 # Build files
 Makefile
