@@ -24,19 +24,25 @@ public:
     MapScraper(const std::string& api_key);
     ~MapScraper();
 
-    // Setters
-    void set_api_key(const std::string& api_key) { m_api_key = api_key; }
-    void set_keyword(const std::string& keyword) { m_keyword = keyword; }
-    void set_location(const std::string& location) { m_location = location; }
-    void set_max_radius(int radius) { m_max_radius = radius; }
-    void set_max_results(int results) { m_max_results = results; }
-
-    // Getters
+    // API Key
     std::string api_key() const { return m_api_key; }
+    void set_api_key(const std::string& api_key) { m_api_key = api_key; }
+
+    // Keyword
     std::string keyword() const { return m_keyword; }
+    void set_keyword(const std::string& keyword) { m_keyword = keyword; }
+
+    // Location
     std::string location() const { return m_location; }
+    void set_location(const std::string& location) { m_location = location; }
+
+    // Max Radius
     int max_radius() const { return m_max_radius; }
+    void set_max_radius(int radius) { m_max_radius = radius; }
+
+    // Max Results
     int max_results() const { return m_max_results; }
+    void set_max_results(int results) { m_max_results = results; }
 
     // Main functionality
     std::vector<Business> search_businesses();
