@@ -3,6 +3,8 @@
 #include <curl/curl.h>
 #include <json/json.h>
 #include <sstream>
+#include <thread>
+#include <chrono>
 
 MapScraper::MapScraper()
     : m_max_radius(5000)
@@ -66,9 +68,7 @@ std::string MapScraper::build_search_url() const {
     std::string key = "&key=" + m_api_key;
 
     return base_url + query + key;
-}
-
-std::string MapScraper::make_http_request(const std::string& url) const {
+}std::string MapScraper::make_http_request(const std::string& url) const {
     CURL* curl;
     CURLcode res;
     std::string response_string;
@@ -169,20 +169,84 @@ std::vector<Business> MapScraper::parse_response(const std::string& json_respons
     return businesses;
 }
 
+std::vector<Business> MapScraper::parse_response_with_pagination(const std::string& json_response, std::string& next_page_token, int& current_count) const {
+    std::vector<Business> businesses;
+    Json::Value root;
+    Json::Reader reader;
+
+    if (!reader.parse(json_response, root)) {
+        std::cerr << "Failed to parse JSON response" << std::endl;
+        return businesses;
+    }
+
+    // Check for next_page_token
+    if (!root["next_page_token"].isNull()) {
+        next_page_token = root["next_page_token"].asString();
+    } else {
+        next_page_token.clear();
+    }
+
+    const Json::Value& results = root["results"];
+    if (results.isNull() || !results.isArray()) {
+        std::cerr << "No results found in response" << std::endl;
+        return businesses;
+    }
+
+    for (const auto& result : results) {
+        if (current_count >= m_max_results) break;
+
+        std::string place_id = result["place_id"].asString();
+        if (!place_id.empty()) {
+            Business business = parse_business_details(place_id);
+            if (!business.name().empty()) {
+                businesses.push_back(business);
+            }
+        }
+    }
+
+    return businesses;
+}
+
 std::vector<Business> MapScraper::search_businesses() {
     if (m_api_key.empty() || m_keyword.empty() || m_location.empty()) {
         std::cerr << "API key, keyword, and location must be set before searching" << std::endl;
         return std::vector<Business>();
     }
 
-    std::string url = build_search_url();
-    std::cout << "Making request to: " << url << std::endl;
+    std::vector<Business> all_businesses;
+    std::string next_page_token;
+    int total_fetched = 0;
 
-    std::string response = make_http_request(url);
-    if (response.empty()) {
-        std::cerr << "Failed to get response from Google Maps API" << std::endl;
-        return std::vector<Business>();
-    }
+    do {
+        std::string url = build_search_url();
+        if (!next_page_token.empty()) {
+            url += "&pagetoken=" + next_page_token;
 
-    return parse_response(response);
+            // Google API requires a delay between page requests
+            std::cout << "Waiting for next page..." << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+        }
+
+        std::cout << "Making request to: " << url << std::endl;
+
+        std::string response = make_http_request(url);
+        if (response.empty()) {
+            std::cerr << "Failed to get response from Google Maps API" << std::endl;
+            break;
+        }
+
+        // Parse this page and get next_page_token
+        auto page_result = parse_response_with_pagination(response, next_page_token, total_fetched);
+
+        // Add businesses from this page
+        for (const auto& business : page_result) {
+            if (total_fetched >= m_max_results) break;
+            all_businesses.push_back(business);
+            total_fetched++;
+        }
+
+        // Stop if we have enough results or no more pages
+    } while (!next_page_token.empty() && total_fetched < m_max_results);
+
+    return all_businesses;
 }

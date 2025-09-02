@@ -1,6 +1,10 @@
 # Folders
 build
 output
+.vscode
+
+# Build files
+Makefile
 
 # Explicit Files
 config.ini

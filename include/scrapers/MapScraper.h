@@ -17,6 +17,7 @@ private:
     std::string build_search_url() const;
     std::string make_http_request(const std::string& url) const;
     std::vector<Business> parse_response(const std::string& json_response) const;
+    std::vector<Business> parse_response_with_pagination(const std::string& json_response, std::string& next_page_token, int& current_count) const;
     Business parse_business_details(const std::string& place_id) const;
 
 public:

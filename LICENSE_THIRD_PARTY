@@ -1,0 +1,29 @@
+# Third-Party Licenses
+
+This project uses the following third-party components, each with their respective licenses:
+
+## Qt Framework
+- **License**: GNU Lesser General Public License (LGPL) v3
+- **Usage**: Dynamically linked libraries for GUI functionality
+- **Source**: Available at https://www.qt.io/download-open-source
+- **Compliance**: Qt libraries are provided as separate files and can be replaced by users
+
+## libcurl
+- **License**: MIT/X derivative license (curl license)
+- **Usage**: HTTP client functionality for API requests
+- **Source**: Available at https://curl.se/libcurl/
+
+### jsoncpp
+- **License**: MIT License
+- **Usage**: JSON parsing functionality
+- **Source**: Available at https://github.com/open-source-parsers/jsoncpp
+
+## LGPL Compliance Notice
+
+This application dynamically links to Qt libraries distributed under the LGPL v3.
+In accordance with LGPL requirements:
+
+1. Qt libraries are provided as separate files and can be replaced
+2. Qt source code is available from the Qt Project
+3. You may modify and redistribute Qt libraries under LGPL terms
+4. This application's proprietary code remains under proprietary license
