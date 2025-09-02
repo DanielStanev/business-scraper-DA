@@ -1,4 +1,4 @@
-#include "WebScraper.h"
+#include "scrapers/WebScraper.h"
 #include <iostream>
 #include <curl/curl.h>
 #include <algorithm>

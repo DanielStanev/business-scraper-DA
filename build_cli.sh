@@ -30,10 +30,13 @@ echo "Compiling with g++..."
 
 # Compile with g++
 g++ -std=c++17 -Wall -Wextra -Iinclude \
-    src/classes/Business.cpp \
-    src/classes/MapScraper.cpp \
-    src/classes/WebScraper.cpp \
-    src/classes/Formatter.cpp \
+    src/core/Business.cpp \
+    src/core/BusinessScraperEngine.cpp \
+    src/scrapers/MapScraper.cpp \
+    src/scrapers/WebScraper.cpp \
+    src/output/Formatter.cpp \
+    src/utils/ConfigManager.cpp \
+    src/utils/FileUtils.cpp \
     src/main_cli.cpp \
     $CURL_FLAGS $JSONCPP_FLAGS \
     -o build/business_scraper

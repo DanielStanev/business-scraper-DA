@@ -1,37 +1,24 @@
 #include <iostream>
 #include <string>
-#include <fstream>
 #include <getopt.h>
 #include <cstdlib>
 #include <algorithm>
-#include <chrono>
-#include <iomanip>
-#include <sstream>
-#include <filesystem>
 
-#include "MapScraper.h"
-#include "Business.h"
-#include "Formatter.h"
-#include "WebScraper.h"
+#include "core/BusinessScraperEngine.h"
+#include "utils/ConfigManager.h"
+#include "utils/FileUtils.h"
 
 // Structure to hold program options
 struct ProgramOptions {
-    std::string keyword;
-    std::string location;
-    int max_radius = 5000;
-    int max_results = 20;
+    SearchOptions search_options;
     OutputFormat output_format = OutputFormat::CSV;
-    bool enhance_with_web_scraping = true;
+    std::string output_filename;  // Custom output filename
     bool show_help = false;
 };
 
 // Function declarations
 void print_usage(const char* program_name);
-std::string read_api_key_from_config();
 bool parse_command_line(int argc, char** argv, ProgramOptions& options);
-std::string get_timestamp_string();
-std::string get_file_extension(OutputFormat format);
-bool write_output_to_file(const std::string& content, const std::string& filename);
 
 int main(int argc, char** argv) {
     ProgramOptions options;
@@ -46,53 +33,82 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    // Read API key from config file
-    std::string api_key = read_api_key_from_config();
-    if (api_key.empty()) {
+    // Load configuration
+    ConfigManager config_manager;
+    if (!config_manager.load_config()) {
+        std::cerr << "Error: Could not load config.ini file. Please create it from config.template.ini" << std::endl;
+        std::cerr << "Config error: " << config_manager.last_error() << std::endl;
         return 1;
     }
 
-    // Create and configure MapScraper
-    MapScraper scraper(api_key, options.keyword, options.location, options.max_radius, options.max_results);
+    std::string api_key = config_manager.get_api_key();
+    if (api_key.empty()) {
+        std::cerr << "Error: google_maps_api_key not found in config.ini" << std::endl;
+        return 1;
+    }
 
-    std::cout << "Searching for '" << options.keyword << "' in '" << options.location << "'..." << std::endl;
-    std::cout << "Max radius: " << options.max_radius << " meters" << std::endl;
-    std::cout << "Max results: " << options.max_results << std::endl << std::endl;
+    // Create and configure the scraper engine
+    BusinessScraperEngine engine;
+    if (!engine.set_api_key(api_key)) {
+        std::cerr << "Error: Invalid API key" << std::endl;
+        return 1;
+    }
 
-    // Search for businesses
-    std::vector<Business> businesses = scraper.search_businesses();
+    // Set up console output callbacks
+    engine.set_status_callback([](const std::string& message) {
+        std::cout << message << std::endl;
+    });
 
-    if (businesses.empty()) {
+    // Display search parameters
+    std::cout << "Searching for '" << options.search_options.keyword
+              << "' in '" << options.search_options.location << "'..." << std::endl;
+    std::cout << "Max radius: " << options.search_options.max_radius << " meters" << std::endl;
+    std::cout << "Max results: " << options.search_options.max_results << std::endl;
+    std::cout << "Web scraping: " << (options.search_options.enhance_with_web_scraping ? "enabled" : "disabled") << std::endl << std::endl;
+
+    // Perform the search
+    SearchResults results = engine.search_businesses(options.search_options);
+
+    if (!results.success) {
+        std::cerr << "Search failed: " << results.error_message << std::endl;
+        return 1;
+    }
+
+    if (results.businesses.empty()) {
         std::cout << "No businesses found." << std::endl;
         return 0;
     }
 
-    // Enhance businesses with web scraping
-    if (options.enhance_with_web_scraping) {
-        WebScraper web_scraper;
-        web_scraper.enhance_businesses(businesses);
-        std::cout << std::endl;
+    // Format and save results
+    std::string formatted_output = engine.format_results(results, options.output_format);
+    if (formatted_output.empty()) {
+        std::cerr << "Error: Failed to format results" << std::endl;
+        return 1;
     }
 
-    // Format and save results
-    Formatter formatter(options.output_format);
+    // Generate output filename and save
+    std::string filename;
+    if (!options.output_filename.empty()) {
+        // Use custom filename provided by user
+        filename = options.output_filename;
+    } else {
+        // Generate timestamped filename
+        filename = FileUtils::generate_output_filename(options.output_format);
+    }
 
-    // Generate output
-    std::string formatted_output = formatter.format_businesses(businesses);
-
-    // Create output filename with timestamp
-    std::string timestamp = get_timestamp_string();
-    std::string extension = get_file_extension(options.output_format);
-    std::string filename = "output/" + timestamp + "." + extension;
-
-    // Write to file
-    if (write_output_to_file(formatted_output, filename)) {
-        std::cout << "Found " << businesses.size() << " businesses." << std::endl;
+    if (FileUtils::write_to_file(formatted_output, filename)) {
+        std::cout << "\nFound " << results.total_found << " businesses." << std::endl;
+        if (results.enhanced_count > 0) {
+            std::cout << "Enhanced " << results.enhanced_count << " businesses with website data." << std::endl;
+        }
         std::cout << "Results saved to: " << filename << std::endl;
     } else {
-        std::cout << "Error saving results to file. Printing to console:" << std::endl;
+        std::cout << "Error saving results to file: " << FileUtils::last_error() << std::endl;
+        std::cout << "Printing to console instead:" << std::endl;
         std::cout << formatted_output << std::endl;
-    }    return 0;
+    }
+
+    return 0;
 }
 
 // Function definitions
@@ -105,40 +121,12 @@ void print_usage(const char* program_name) {
               << "  -d, --distance METERS     Max search radius in meters (default: 5000)\n"
               << "  -r, --results NUMBER      Max number of results (default: 20)\n"
               << "  -f, --format FORMAT       Output format: csv, json, yaml, xml (default: csv)\n"
+              << "  -o, --output FILENAME     Output filename (default: auto-generated with timestamp)\n"
               << "  --no-web-scraping        Disable web scraping enhancement (faster but less data)\n"
               << "  -h, --help               Show this help message\n\n"
               << "The Google Maps API key should be configured in config.ini file.\n"
               << "Web scraping is enabled by default to gather additional contact information.\n"
               << std::endl;
-}
-
-std::string read_api_key_from_config() {
-    std::ifstream config_file("config.ini");
-    if (!config_file.is_open()) {
-        std::cerr << "Error: Could not open config.ini file. Please create it from config.template.ini" << std::endl;
-        return "";
-    }
-
-    std::string line;
-    while (std::getline(config_file, line)) {
-        // Skip comments and empty lines
-        if (line.empty() || line[0] == '#' || line[0] == ';' || line[0] == '[') {
-            continue;
-        }
-
-        // Look for the API key line
-        size_t pos = line.find("google_maps_api_key=");
-        if (pos != std::string::npos) {
-            std::string api_key = line.substr(pos + 20); // Length of "google_maps_api_key="
-            // Trim whitespace
-            api_key.erase(0, api_key.find_first_not_of(" \t"));
-            api_key.erase(api_key.find_last_not_of(" \t") + 1);
-            return api_key;
-        }
-    }
-
-    std::cerr << "Error: google_maps_api_key not found in config.ini" << std::endl;
-    return "";
 }
 
 bool parse_command_line(int argc, char** argv, ProgramOptions& options) {
@@ -149,6 +137,7 @@ bool parse_command_line(int argc, char** argv, ProgramOptions& options) {
         {"distance",        required_argument, 0, 'd'},
         {"results",         required_argument, 0, 'r'},
         {"format",          required_argument, 0, 'f'},
+        {"output",          required_argument, 0, 'o'},
         {"no-web-scraping", no_argument,       0, 'n'},
         {"help",            no_argument,       0, 'h'},
         {0, 0, 0, 0}
@@ -158,24 +147,24 @@ bool parse_command_line(int argc, char** argv, ProgramOptions& options) {
     int c;
 
     // Parse command line arguments
-    while ((c = getopt_long(argc, argv, "k:l:d:r:f:nh", long_options, &option_index)) != -1) {
+    while ((c = getopt_long(argc, argv, "k:l:d:r:f:o:nh", long_options, &option_index)) != -1) {
         switch (c) {
             case 'k':
-                options.keyword = optarg;
+                options.search_options.keyword = optarg;
                 break;
             case 'l':
-                options.location = optarg;
+                options.search_options.location = optarg;
                 break;
             case 'd':
-                options.max_radius = std::atoi(optarg);
-                if (options.max_radius <= 0) {
+                options.search_options.max_radius = std::atoi(optarg);
+                if (options.search_options.max_radius <= 0) {
                     std::cerr << "Error: Distance must be a positive number" << std::endl;
                     return false;
                 }
                 break;
             case 'r':
-                options.max_results = std::atoi(optarg);
-                if (options.max_results <= 0) {
+                options.search_options.max_results = std::atoi(optarg);
+                if (options.search_options.max_results <= 0) {
                     std::cerr << "Error: Results must be a positive number" << std::endl;
                     return false;
                 }
@@ -198,8 +187,11 @@ bool parse_command_line(int argc, char** argv, ProgramOptions& options) {
                 }
                 break;
             }
+            case 'o':
+                options.output_filename = optarg;
+                break;
             case 'n':
-                options.enhance_with_web_scraping = false;
+                options.search_options.enhance_with_web_scraping = false;
                 break;
             case 'h':
                 print_usage(argv[0]);
@@ -214,57 +206,11 @@ bool parse_command_line(int argc, char** argv, ProgramOptions& options) {
     }
 
     // Check required arguments
-    if (options.keyword.empty() || options.location.empty()) {
+    if (options.search_options.keyword.empty() || options.search_options.location.empty()) {
         std::cerr << "Error: Both --keyword and --location are required\n" << std::endl;
         print_usage(argv[0]);
         return false;
     }
 
     return true;
-}
-
-std::string get_timestamp_string() {
-    auto now = std::chrono::system_clock::now();
-    auto time_t = std::chrono::system_clock::to_time_t(now);
-
-    std::stringstream ss;
-    ss << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S");
-    return ss.str();
-}
-
-std::string get_file_extension(OutputFormat format) {
-    switch (format) {
-        case OutputFormat::CSV:
-            return "csv";
-        case OutputFormat::JSON:
-            return "json";
-        case OutputFormat::YAML:
-            return "yml";
-        case OutputFormat::XML:
-            return "xml";
-        default:
-            return "csv";
-    }
-}
-
-bool write_output_to_file(const std::string& content, const std::string& filename) {
-    try {
-        // Create output directory if it doesn't exist
-        std::filesystem::create_directories("output");
-
-        // Write content to file
-        std::ofstream file(filename);
-        if (!file.is_open()) {
-            std::cerr << "Error: Could not create output file: " << filename << std::endl;
-            return false;
-        }
-
-        file << content;
-        file.close();
-
-        return true;
-    } catch (const std::exception& e) {
-        std::cerr << "Error writing to file: " << e.what() << std::endl;
-        return false;
-    }
 }

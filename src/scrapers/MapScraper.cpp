@@ -1,4 +1,4 @@
-#include "MapScraper.h"
+#include "scrapers/MapScraper.h"
 #include <iostream>
 #include <curl/curl.h>
 #include <json/json.h>
