@@ -144,6 +144,7 @@ std::string Formatter::format_as_yaml(const std::vector<Business>& businesses) c
         } else {
             oss << "    social_media_links: []\n";
         }
+        oss << '\n';
     }
 
     return oss.str();
