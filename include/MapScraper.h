@@ -22,6 +22,8 @@ private:
 public:
     MapScraper();
     MapScraper(const std::string& api_key);
+    MapScraper(const std::string& api_key, const std::string& keyword, const std::string& location,
+               int max_radius = 5000, int max_results = 20);
     ~MapScraper();
 
     // API Key

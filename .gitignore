@@ -1,2 +1,6 @@
+# Folders
 build
+output
+
+# Explicit Files
 config.ini

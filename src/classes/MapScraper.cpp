@@ -15,34 +15,45 @@ MapScraper::MapScraper(const std::string& api_key)
     , m_max_results(20)
 {}
 
+MapScraper::MapScraper(const std::string& api_key, const std::string& keyword, const std::string& location,
+                       int max_radius, int max_results)
+    : m_api_key(api_key)
+    , m_keyword(keyword)
+    , m_location(location)
+    , m_max_radius(max_radius)
+    , m_max_results(max_results)
+{}
+
 MapScraper::~MapScraper() {}
 
-// URL encoding function
-std::string url_encode(const std::string& value) {
-    CURL* curl = curl_easy_init();
-    if (curl) {
-        char* encoded = curl_easy_escape(curl, value.c_str(), value.length());
-        if (encoded) {
-            std::string result(encoded);
-            curl_free(encoded);
+namespace {
+    // URL encoding function
+    std::string url_encode(const std::string& value) {
+        CURL* curl = curl_easy_init();
+        if (curl) {
+            char* encoded = curl_easy_escape(curl, value.c_str(), value.length());
+            if (encoded) {
+                std::string result(encoded);
+                curl_free(encoded);
+                curl_easy_cleanup(curl);
+                return result;
+            }
             curl_easy_cleanup(curl);
-            return result;
         }
-        curl_easy_cleanup(curl);
+        return value; // fallback to original if encoding fails
     }
-    return value; // fallback to original if encoding fails
-}
 
-// Callback function for curl to write response data
-static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* s) {
-    size_t newLength = size * nmemb;
-    try {
-        s->append((char*)contents, newLength);
-    } catch (std::bad_alloc& e) {
-        return 0;
+    // Callback function for curl to write response data
+    size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* s) {
+        size_t newLength = size * nmemb;
+        try {
+            s->append((char*)contents, newLength);
+        } catch (std::bad_alloc& e) {
+            return 0;
+        }
+        return newLength;
     }
-    return newLength;
-}
+} // end anonymous namespace
 
 std::string MapScraper::build_search_url() const {
     std::string base_url = "https://maps.googleapis.com/maps/api/place/textsearch/json?";
