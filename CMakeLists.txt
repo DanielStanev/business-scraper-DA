@@ -16,9 +16,6 @@ endif()
 if(NOT WIN32)
     pkg_check_modules(CURL REQUIRED libcurl)
     pkg_check_modules(JSONCPP REQUIRED jsoncpp)
-    find_package(CURL CONFIG REQUIRED)
-    find_package(jsoncpp CONFIG REQUIRED)
-    find_package(ZLIB CONFIG REQUIRED)
 endif()
 
 # Set Qt to auto-generate MOC files
@@ -56,6 +53,10 @@ if(WIN32)
     )
     target_link_libraries(business_scraper_core CURL::libcurl jsoncpp_lib ZLIB::ZLIB)
 else()
+    target_include_directories(business_scraper_core PRIVATE
+        ${CURL_INCLUDE_DIRS}
+        ${JSONCPP_INCLUDE_DIRS}
+    )
     target_link_libraries(business_scraper_core
         ${CURL_LIBRARIES}
         ${JSONCPP_LIBRARIES}
