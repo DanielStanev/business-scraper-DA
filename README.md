@@ -10,6 +10,20 @@ The original web app is currently in a private GitHub repository because I naive
 
 This C++ version is a complete rewrite using Qt for the desktop interface. I built it to practice making desktop applications and to create a more professional, standalone version of the tool.
 
+## Screenshots
+
+### Startup
+![Startup](screenshots/startup.png)
+
+### Configuration
+![Configuration Dialog](screenshots/config.png)
+
+### Results Display
+![Results View](screenshots/results.png)
+
+### Output File
+![Output File](screenshots/output.png)
+
 ## Building on Linux
 
 Just run:
